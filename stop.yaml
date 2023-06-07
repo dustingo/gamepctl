@@ -1,0 +1,46 @@
+kind: stop
+metadata:
+  user: root # 服务器用户
+  port: "59878" # 服务器SSH端口
+  concurrence: 5 # 在执行并发操作时的并发量
+  annotations: 国服 #  标识声明，便于识别操作对象
+spec:
+  preExec: # 要先执行的操作，此处为顺序执行
+    - server: game92 # 服务器的IP|hostname
+      type: ssh # 启动方式，默认ssh，可选：ssh|http
+      wait: 1 # 启动后等待时间，默认0s
+      command: ["cd /tmp", "&&", "date >>time.date"] # 执行的命令
+    - server: game91
+      type: ssh
+      wait: 1
+      command: ["cd /tmp", "&&", "date >>time.date"]
+    - server: game93
+      type: http
+      url: http://game93:9094/start
+  exec: # 无执行顺序需求的操作，批量，受concurrence限制
+    - server: game90
+      type: ssh
+      command: ["cd /tmp", "&&", "date >> time.date"]
+    - server: game89
+      type: ssh
+      command: ["cd /tmp", "&&", "date >> time.date"]
+    - server: game88
+      type: ssh
+      command: ["cd /tmp", "&&", "date >> time.date"]
+    - server: game87
+      type: ssh
+      command: ["cd /tmp", "&&", "date >> time.date"]
+check: # 执行完操作或的检查项
+  data:
+    - server: game92
+      type: ps
+      process: hostwatch # 进程唯一标识
+      number: 0 # 预期的进程标识数量
+    - server: game97
+      type: ps
+      process: hostwatch
+      number: 0
+    - server: game94
+      type: port
+      process: ceneter
+      port: [10000, 10001, 10002]
