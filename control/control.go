@@ -87,6 +87,7 @@ func (c *Control) Run() {
 				failed.name = preJob.Server
 				failed.command = preJob.Url
 				c.Failed = append(c.Failed, failed)
+				continue
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != 200 {
