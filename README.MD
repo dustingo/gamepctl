@@ -18,15 +18,14 @@ gamectl当前支持开、关两种操作，为了方便区分，配置文件强�
 3. spec： 对"操作"的定义
     - preExec： 定义某些进程开、关顺序，此处会按顺序执行
       - server: string; 服务器的IP地址或hostname
-      - type: string; 执行方式，可选: 【ssh|http】
+      - type: string; 执行方式，可选: 【local|remote】
       - wait: int; 执行完后等待的时间，单位为second
       - command: []string；type为ssh时，要执行的命令，如:  ["cd /tmp","&&", "date >>time.date"]
-      - url： string; type为http时，需要访问的url地址
 
     - exec: 对于除了需要指定操作顺序的进程之外，定义其他所有没有操作顺序的进程操作。字段类型同preExec，执行速度受metadata.concurrence限制
 
 4. check: preExec与exec执行完后最终的校验部分定义
-   - type:  string; 执行方式，可选: 【ps|port】
+   - type:  string; 执行方式，可选: 【local|remote|port】
    - server:   string; 服务器的IP地址或hostname
    - process: string;当type=ps时使用，进程的唯一标识，通过ps检查此唯一标识确认后台进程是否启动
    - num: int;当type=ssh时使用，process标识的进程预期数量，如开启的时候我们预期数量为1，关闭的时候预期数量为0
@@ -49,7 +48,6 @@ Error: running start operation but kind is  stop
 [x]start [国服] game process
 Server:game92 Type:ssh Command:[cd /tmp && date >>time.date] [Success]
 Server:game91 Type:ssh Command:[cd /tmp && date >>time.date] [Success]
-Server:game87 Type:http Url:http://localhost:9090/api/v1/labels [Success]
 Server:game89 Type:ssh Command:[cd /tmp && date >> time.date] [Success]
 Server:game90 Type:ssh Command:[cd /tmp && date >> time.date] [Success]
 Server:game87 Type:ssh Command:[cd /tmp && date >> time.date] [Success]
@@ -66,7 +64,6 @@ start game process success
 level=error caller=control.go:69 Error="exit status 127" StdErr="bash: dates: command not found\n"
 Server:game92 Type:ssh Command:[cd /tmp && dates >>time.date] [Failed]
 Server:game91 Type:ssh Command:[cd /tmp && date >>time.date] [Success]
-Server:game87 Type:http Url:http://localhost:9090/api/v1/labels [Success]
 level=error caller=control.go:219 Error="exit status 255" StdErr="ssh: Could not resolve hostname game901: Name or service not known\r\n"
 Server:game901 Type:ssh Command:[cd /tmp && date >> time.date] [Failed]
 Server:game89 Type:ssh Command:[cd /tmp && date >> time.date] [Success]

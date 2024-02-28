@@ -1,7 +1,7 @@
 package config
 
 import (
-	"io/ioutil"
+	"os"
 
 	"github.com/pelletier/go-toml"
 	"sigs.k8s.io/yaml"
@@ -36,10 +36,10 @@ type Settings struct {
 	Type    string   `json:"type"`   // ssh,port,ps
 	Command []string `json:"command,omitempty"`
 	Wait    int      `json:"wait,omitempty"`
-	Url     string   `json:"url,omitempty"`     //http url
-	Process string   `json:"process,omitempty"` // process name
-	Number  int      `json:"number,omitempty"`  // number of process
-	Ports   []int    `json:"port,omitempty"`    // process ports
+	//Url     string   `json:"url,omitempty"`     //http url
+	Process string `json:"process,omitempty"` // process name
+	Number  int    `json:"number,omitempty"`  // number of process
+	Ports   []int  `json:"port,omitempty"`    // process ports
 }
 
 // Check check module
@@ -68,7 +68,7 @@ func LoadServerConfig(path string) (map[string]string, error) {
 }
 
 func LoadCmdConfig(path string) (*CmdConfig, error) {
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

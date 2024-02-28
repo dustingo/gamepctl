@@ -52,54 +52,31 @@ func (c *Control) Run() {
 	failed := FailedData{}
 	c.Offline = []FailedData{}
 	wg := sync.WaitGroup{}
-	//wg2 := sync.WaitGroup{}
-	// switch c.Cmdcfg.Kind {
-	// case "start":
 	fmt.Printf("[x]%s [%s] game process\n", c.Cmdcfg.Kind, c.Cmdcfg.Metadata.Annotations)
 	for _, preJob := range c.Cmdcfg.Spec.PreExec {
+		var cmd *exec.Cmd
+		var stdErr bytes.Buffer
+		var stdOut bytes.Buffer
+
 		status := "Success"
-		if strings.ToLower(preJob.Type) == "ssh" {
-			//ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			//defer cancel()
-			shell := []string{fmt.Sprintf("-p%s", c.Cmdcfg.Metadata.Port), fmt.Sprintf("%s@%s", c.Cmdcfg.Metadata.User, preJob.Server)}
-			shell = append(shell, preJob.Command...)
-			//fmt.Println("shell = ", shell)
-			cmd := exec.Command("ssh", shell...)
-			var stdErr bytes.Buffer
-			var stdOut bytes.Buffer
-			cmd.Stderr = &stdErr
-			cmd.Stdout = &stdOut
-			if err := cmd.Run(); err != nil {
-				level.Error(c.Logger).Log("Error", err, "StdErr", stdErr.String())
-				status = "Failed"
-				failed.name = preJob.Server
-				failed.command = strings.Join(preJob.Command, " ")
-				c.Failed = append(c.Failed, failed)
-			}
-			fmt.Printf("Server:%s Type:%s Command:%s [%s]\n", preJob.Server, preJob.Type, preJob.Command, status)
-			time.Sleep(time.Duration(preJob.Wait) * time.Second)
-		} else if strings.ToLower(preJob.Type) == "http" {
-			client := newHttpClient()
-			resp, err := client.Get(preJob.Url)
-			if err != nil {
-				level.Error(c.Logger).Log("Error", err.Error())
-				status = "Failed"
-				failed.name = preJob.Server
-				failed.command = preJob.Url
-				c.Failed = append(c.Failed, failed)
-				continue
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != 200 {
-				level.Error(c.Logger).Log("StatusCode", resp.StatusCode)
-				status = "Failed"
-				failed.name = preJob.Server
-				failed.command = preJob.Url
-				c.Failed = append(c.Failed, failed)
-			}
-			fmt.Printf("Server:%s Type:%s Url:%s [%s]", preJob.Server, preJob.Type, preJob.Url, status)
-			time.Sleep(time.Duration(preJob.Wait) * time.Second)
+		if strings.ToLower(preJob.Type) == "remote" {
+			job := []string{fmt.Sprintf("-p%s", c.Cmdcfg.Metadata.Port), fmt.Sprintf("%s@%s", c.Cmdcfg.Metadata.User, preJob.Server)}
+			job = append(job, preJob.Command...)
+			cmd = exec.Command("ssh", job...)
+		} else if strings.ToLower(preJob.Type) == "local" {
+			cmd = exec.Command("sh", "-c", strings.Join(preJob.Command, " "))
 		}
+		cmd.Stderr = &stdErr
+		cmd.Stdout = &stdOut
+		if err := cmd.Run(); err != nil {
+			level.Error(c.Logger).Log("Error", err, "StdErr", stdErr.String())
+			status = "Failed"
+			failed.name = preJob.Server
+			failed.command = strings.Join(preJob.Command, " ")
+			c.Failed = append(c.Failed, failed)
+		}
+		fmt.Printf("Server:%s Type:%s Command:%s [%s]\n", preJob.Server, preJob.Type, preJob.Command, status)
+		time.Sleep(time.Duration(preJob.Wait) * time.Second)
 	}
 	// 批量执行
 	ch := make(chan struct{}, c.Cmdcfg.Metadata.Concurrence)
@@ -238,49 +215,29 @@ func concurrentExec(s config.Settings, m config.Metadata, logger log.Logger, fai
 	defer func() { <-ch }()
 	ch <- struct{}{}
 	var errorData FailedData
+	var cmd *exec.Cmd
 	status := "Success"
-	if strings.ToLower(s.Type) == "ssh" {
+	if strings.ToLower(s.Type) == "remote" {
 		shell := []string{fmt.Sprintf("-p%s", m.Port), fmt.Sprintf("%s@%s", m.User, s.Server)}
 		shell = append(shell, s.Command...)
-		cmd := exec.Command("ssh", shell...)
-		var stdErr bytes.Buffer
-		var stdOut bytes.Buffer
-		cmd.Stderr = &stdErr
-		cmd.Stdout = &stdOut
-		if err := cmd.Run(); err != nil {
-			level.Error(logger).Log("Error", err, "StdErr", stdErr.String())
-			status = "Failed"
-			errorData.name = s.Server
-			errorData.command = strings.Join(s.Command, " ")
-			lock.Lock()
-			*failed = append(*failed, errorData)
-			lock.Unlock()
-		}
-		fmt.Printf("Server:%s Type:%s Command:%s [%s]\n", s.Server, s.Type, s.Command, status)
-	} else if strings.ToLower(s.Type) == "http" {
-		client := newHttpClient()
-		resp, err := client.Get(s.Url)
-		if err != nil {
-			level.Error(logger).Log("Error", err.Error())
-			status = "Failed"
-			errorData.name = s.Server
-			errorData.command = s.Url
-			lock.Lock()
-			*failed = append(*failed, errorData)
-			lock.Unlock()
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			level.Error(logger).Log("StatusCode", resp.StatusCode)
-			status = "Failed"
-			errorData.name = s.Server
-			errorData.command = s.Url
-			lock.Lock()
-			*failed = append(*failed, errorData)
-			lock.Unlock()
-		}
-		fmt.Printf("Server:%s Type:%s Url:%s [%s]\n", s.Server, s.Type, s.Url, status)
+		cmd = exec.Command("ssh", shell...)
+	} else if strings.ToLower(s.Type) == "local" {
+		cmd = exec.Command("sh", "-c", strings.Join(s.Command, " "))
 	}
+	var stdErr bytes.Buffer
+	var stdOut bytes.Buffer
+	cmd.Stderr = &stdErr
+	cmd.Stdout = &stdOut
+	if err := cmd.Run(); err != nil {
+		level.Error(logger).Log("Error", err, "StdErr", stdErr.String())
+		status = "Failed"
+		errorData.name = s.Server
+		errorData.command = strings.Join(s.Command, " ")
+		lock.Lock()
+		*failed = append(*failed, errorData)
+		lock.Unlock()
+	}
+	fmt.Printf("Server:%s Type:%s Command:%s [%s]\n", s.Server, s.Type, s.Command, status)
 }
 
 func concurrentCheck(k string, s config.Settings, m config.Metadata, logger log.Logger, offLine *[]FailedData, lock *sync.Mutex, wg *sync.WaitGroup, ch chan struct{}) {
@@ -288,68 +245,17 @@ func concurrentCheck(k string, s config.Settings, m config.Metadata, logger log.
 	defer func() { <-ch }()
 	var offData FailedData
 	ch <- struct{}{}
-	if strings.ToLower(s.Type) == "ps" {
+	var cmd *exec.Cmd
+	if strings.ToLower(s.Type) == "remote" {
 		shell := []string{
 			fmt.Sprintf("-p%s", m.Port),
 			fmt.Sprintf("%s@%s", m.User, s.Server),
 			fmt.Sprintf("ps -ef|grep \"%s\"|egrep -v \"grep|SCREEN\"|wc -l", s.Process),
 		}
-		cmd := exec.Command("ssh", shell...)
-		var stdErr bytes.Buffer
-		var stdOut bytes.Buffer
-		cmd.Stderr = &stdErr
-		cmd.Stdout = &stdOut
-		if err := cmd.Run(); err != nil {
-			level.Error(logger).Log("Error", err, "StdErr", stdErr.String())
-			offData.name = s.Server
-			offData.command = s.Process
-			lock.Lock()
-			*offLine = append(*offLine, offData)
-			lock.Unlock()
-			return
-		}
-		n, err := strconv.Atoi(strings.Trim(stdOut.String(), "\n"))
-		if err != nil {
-			level.Error(logger).Log("Error", err)
-			offData.name = s.Server
-			offData.command = s.Process
-			lock.Lock()
-			*offLine = append(*offLine, offData)
-			lock.Unlock()
-			return
-		}
-		fmt.Printf("Server:%s Process:%s ProcessNumber: %d [checked]\n", s.Server, s.Process, n)
-		switch k {
-		case "start":
-			if n != s.Number {
-				offData.name = s.Server
-				offData.command = s.Process
-				lock.Lock()
-				*offLine = append(*offLine, offData)
-				lock.Unlock()
-			} else {
-				lock.Lock()
-				onLineProData[s.Server+"_"+s.Process] = n
-				onLineSerData[s.Server] = s.Process
-				lock.Unlock()
-			}
-		case "stop":
-			//fmt.Println(" 接收到了", k, n)
-			if n != s.Number {
-				lock.Lock()
-				onLineProData[s.Server+"_"+s.Process] = n
-				onLineSerData[s.Server] = s.Process
-				lock.Unlock()
-			} else {
-				if _, ok := onLineProData[s.Server+"_"+s.Process]; ok {
-					lock.Lock()
-					delete(onLineProData, s.Server+"_"+s.Process)
-					delete(onLineSerData, s.Server)
-					lock.Unlock()
-				}
-			}
-		}
-
+		cmd = exec.Command("ssh", shell...)
+	} else if strings.ToLower(s.Type) == "local" {
+		shell := fmt.Sprintf("ps -ef|grep \"%s\"|egrep -v \"grep|SCREEN\"|wc -l", s.Process)
+		cmd = exec.Command("sh", "-c", shell)
 	} else if strings.ToLower(s.Type) == "port" {
 		for _, port := range s.Ports {
 			conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", s.Server, port), 5*time.Second)
@@ -400,6 +306,63 @@ func concurrentCheck(k string, s config.Settings, m config.Metadata, logger log.
 				lock.Unlock()
 			}
 		}
+		return
+	}
+	var stdErr bytes.Buffer
+	var stdOut bytes.Buffer
+	//cmd := newCmd(s, m)
+	cmd.Stderr = &stdErr
+	cmd.Stdout = &stdOut
+	if err := cmd.Run(); err != nil {
+		level.Error(logger).Log("Error", err, "StdErr", stdErr.String())
+		offData.name = s.Server
+		offData.command = s.Process
+		lock.Lock()
+		*offLine = append(*offLine, offData)
+		lock.Unlock()
+		return
+	}
+	n, err := strconv.Atoi(strings.Trim(stdOut.String(), "\n"))
+	if err != nil {
+		level.Error(logger).Log("Error", err)
+		offData.name = s.Server
+		offData.command = s.Process
+		lock.Lock()
+		*offLine = append(*offLine, offData)
+		lock.Unlock()
+		return
+	}
+	fmt.Printf("Server:%s Process:%s ProcessNumber: %d [checked]\n", s.Server, s.Process, n)
+
+	switch k {
+	case "start":
+		if n != s.Number {
+			offData.name = s.Server
+			offData.command = s.Process
+			lock.Lock()
+			*offLine = append(*offLine, offData)
+			lock.Unlock()
+		} else {
+			lock.Lock()
+			onLineProData[s.Server+"_"+s.Process] = n
+			onLineSerData[s.Server] = s.Process
+			lock.Unlock()
+		}
+	case "stop":
+		//fmt.Println(" 接收到了", k, n)
+		if n != s.Number {
+			lock.Lock()
+			onLineProData[s.Server+"_"+s.Process] = n
+			onLineSerData[s.Server] = s.Process
+			lock.Unlock()
+		} else {
+			if _, ok := onLineProData[s.Server+"_"+s.Process]; ok {
+				lock.Lock()
+				delete(onLineProData, s.Server+"_"+s.Process)
+				delete(onLineSerData, s.Server)
+				lock.Unlock()
+			}
+		}
 	}
 }
 
@@ -415,4 +378,20 @@ func unique(slice []FailedData) []FailedData {
 		}
 	}
 	return result
+}
+
+func newCmd(s config.Settings, m config.Metadata) *exec.Cmd {
+	var cmd *exec.Cmd
+	if strings.ToLower(s.Type) == "remote" {
+		shell := []string{
+			fmt.Sprintf("-p%s", m.Port),
+			fmt.Sprintf("%s@%s", m.User, s.Server),
+			fmt.Sprintf("ps -ef|grep \"%s\"|egrep -v \"grep|SCREEN\"|wc -l", s.Process),
+		}
+		cmd = exec.Command("ssh", shell...)
+	} else if strings.ToLower(s.Type) == "local" {
+		shell := fmt.Sprintf("ps -ef|grep \"%s\"|egrep -v \"grep|SCREEN\"|wc -l", s.Process)
+		cmd = exec.Command("sh", "-c", shell)
+	}
+	return cmd
 }

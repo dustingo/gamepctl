@@ -8,37 +8,37 @@ metadata:
 spec:
   preExec: # 要先执行的操作，此处为顺序执行
     - server: game92 # 服务器的IP|hostname
-      type: ssh # 启动方式，默认ssh，可选：ssh|http
+      type: remote # 启动方式，默认ssh，可选：remote|local
       wait: 1 # 启动后等待时间，默认0s
-      command: ["cd /tmp", "&&", "date >>time.date"] # 执行的命令
+      command: ["cd /tmp", "&&", "date >>time92.remote"] # 执行的命令
     - server: game91
-      type: ssh
+      type: remote
       wait: 1
-      command: ["cd /tmp", "&&", "date >>time.date"]
+      command: ["cd /tmp", "&&", "date >>time91.remote"]
     - server: game93
-      type: http
-      url: http://game93:9094/start
+      type: local
+      command: ["cd /tmp", "&&", "date >>time93.local"]
   exec: # 无执行顺序需求的操作，批量，受concurrence限制
     - server: game90
-      type: ssh
-      command: ["cd /tmp", "&&", "date >> time.date"]
+      type: remote
+      command: ["cd /tmp", "&&", "date >> time90.remote"]
     - server: game89
-      type: ssh
-      command: ["cd /tmp", "&&", "date >> time.date"]
+      type: remote
+      command: ["cd /tmp", "&&", "date >> time89.remote"]
     - server: game88
-      type: ssh
-      command: ["cd /tmp", "&&", "date >> time.date"]
+      type: local
+      command: ["cd /tmp", "&&", "date >> time88.local"]
     - server: game87
-      type: ssh
-      command: ["cd /tmp", "&&", "date >> time.date"]
+      type: local
+      command: ["cd /tmp", "&&", "date >> time87.local"]
 check: # 执行完操作或的检查项
   data:
     - server: game92
-      type: ps
+      type: remote
       process: hostwatch # 进程唯一标识
       number: 1 # 预期的进程标识数量
     - server: game97
-      type: ps
+      type: local
       process: hostwatch
       number: 1
     - server: game94
